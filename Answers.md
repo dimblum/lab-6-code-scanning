@@ -1,6 +1,6 @@
-# Answers to Assignment 8 Part 3
+# Answers to Part 3
 
-Add your answers to the questions in Assignment 8 Part 3, Step 2 below. 
+Add your answers to the questions in Part 3, Step 2 below. 
 
 ## Vulernability Remediation:
 ### Vulnerability 1: 
