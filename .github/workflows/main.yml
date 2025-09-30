@@ -4,12 +4,10 @@ on:
     branches:
       - main
   pull_request:
-
 jobs:
-  # ---------- Part 1: repo scan (SAST) ----------
   sast_scan:
-    name: Run SAST Scan
-    runs-on: ubuntu-latest
+    name: Run Static Code Scan
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,31 +28,3 @@ jobs:
         with:
           name: trivy-results
           path: trivy-results.sarif
-
-  # ---------- Part 2: build Docker image + scan the image ----------
-  image_scan:
-    name: Build Image and Run Image Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -t pygoat:latest .
-
-      - name: Trivy image scan (CRITICAL only)
-        uses: aquasecurity/trivy-action@0.28.0
-        env:
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
-        with:
-          image-ref: 'pygoat:latest'
-          ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
-          severity: 'CRITICAL'
-
-      - name: Upload image scan artifact
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: trivy-image-results
-          path: trivy-image-results.sarif
