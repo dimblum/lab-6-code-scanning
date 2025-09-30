@@ -1,31 +1,27 @@
 name: build
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
 
 jobs:
-  # ---------- Part 1: Repo (SAST) scan with Trivy ----------
   sast_scan:
     name: Run SAST Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner in repo mode
+      - name: Trivy repo scan
         uses: aquasecurity/trivy-action@0.28.0
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
-          scan-type: 'fs'
+          scan-type: fs
           ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL'
-
-      - name: Upload build artifact
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL
+      - name: Upload SAST artifact
         uses: actions/upload-artifact@v4.4.3
         with:
           name: trivy-results
@@ -37,26 +33,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Docker
-        uses: docker-practice/actions-setup-docker@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image (local)
+        uses: docker/build-push-action@v5
         with:
-          docker_version: '20.10.7'
-
-      - name: Build Docker Image
-        run: docker build -f Dockerfile -t pygoat_app:latest .
-
-      - name: Docker Scout Scan
+          context: .
+          tags: pygoat_app:latest
+          push: false
+          load: true
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.REPO_USER }}
+          password: ${{ secrets.REPO_PWD }}
+      - name: Docker Scout scan
         uses: docker/scout-action@v1.15.0
         with:
-          dockerhub-user: ${{ secrets.REPO_USER }}
-          dockerhub-password: ${{ secrets.REPO_PWD }}
           command: quickview,cves
+          image: pygoat_app:latest
           only-severities: critical,high
           sarif-file: scout-report.sarif
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Scout artifact
+        uses: actions/upload-artifact@v4.4.3
         if: always()
         with:
           name: docker-scout-findings
