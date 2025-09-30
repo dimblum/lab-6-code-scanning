@@ -1,62 +1,60 @@
 name: build
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
 
 jobs:
+  # ---------- Part 1: repo scan (SAST) ----------
   sast_scan:
     name: Run SAST Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Trivy repo scan
+
+      - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@0.28.0
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
-          scan-type: fs
+          scan-type: 'fs'
           ignore-unfixed: true
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL
-      - name: Upload SAST artifact
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL'
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4.4.3
         with:
           name: trivy-results
           path: trivy-results.sarif
 
+  # ---------- Part 2: build Docker image + scan the image ----------
   image_scan:
     name: Build Image and Run Image Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build image (local)
-        uses: docker/build-push-action@v5
+
+      - name: Build Docker image
+        run: docker build -t pygoat:latest .
+
+      - name: Trivy image scan (CRITICAL only)
+        uses: aquasecurity/trivy-action@0.28.0
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
-          context: .
-          tags: pygoat_app:latest
-          push: false
-          load: true
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.REPO_USER }}
-          password: ${{ secrets.REPO_PWD }}
-      - name: Docker Scout scan
-        uses: docker/scout-action@v1.15.0
-        with:
-          command: quickview,cves
-          image: pygoat_app:latest
-          only-severities: critical,high
-          sarif-file: scout-report.sarif
-      - name: Upload Scout artifact
+          image-ref: 'pygoat:latest'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          severity: 'CRITICAL'
+
+      - name: Upload image scan artifact
         uses: actions/upload-artifact@v4.4.3
-        if: always()
         with:
-          name: docker-scout-findings
-          path: scout-report.sarif
+          name: trivy-image-results
+          path: trivy-image-results.sarif
